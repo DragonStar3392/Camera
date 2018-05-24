@@ -38,7 +38,7 @@ class Camera:
                 if os.path.isdir(des):#if destination exists
                     self.destination = des
             except:
-                print("something")
+                print("Sum Ting Wong")
     def setRec(self,b):
         if type(b) is bool:
             self.rec = b
@@ -52,13 +52,34 @@ class Camera:
             os.makedirs(self.destination+fldr)
         timestr = timestr[11:16]
         out = cv2.VideoWriter(self.destination+fldr+"//"+timestr+'.avi', fourcc, 20.0, (640, 480))
+
+        previousFrame = None
+        diffFrame = None
         while self.getState() == "on":
             _,frame = cap.read()
 
-            cv2.imshow('frame', frame)#show capture frame
-            #analyze the frame here
-            #if found mid-sized difference, start record
-            #else close record if open
+            if previousFrame is not None:
+                # analyze the frame here
+                # if found mid-sized difference, start record
+                # else close record if open
+                diffFrame = cv2.subtract(frame,previousFrame)
+
+                diffgray = cv2.cvtColor(diffFrame, cv2.COLOR_BGR2GRAY)
+                ret, mask = cv2.threshold(diffgray, 60, 255, cv2.THRESH_BINARY_INV)
+
+                cv2.imshow('mask', mask)#difference between prevFrame and current frame
+
+                if cv2.countNonZero(mask) != 0:
+                    print("Image is white")####### continue from here
+
+            # save current frame
+            previousFrame = frame
+
+            cv2.imshow('frame', frame)  # show capture frame
+
+            if diffFrame is not None:
+                cv2.imshow('diff', diffFrame)  # show capture frame
+
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
                 if self.getRec() == False:#turn on rec with esc
@@ -71,6 +92,7 @@ class Camera:
 
             if self.getRec() == True:  # user want to record
                 out.write(frame)
+
         cv2.destroyAllWindows()
         cap.release()
         out.release()  # release recording vid
