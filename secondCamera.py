@@ -38,7 +38,7 @@ class Camera:
                 if os.path.isdir(des):#if destination exists
                     self.destination = des
             except:
-                print("something")
+                print("Sum Ting Wong")
     def setRec(self,b):
         if type(b) is bool:
             self.rec = b
@@ -52,25 +52,42 @@ class Camera:
             os.makedirs(self.destination+fldr)
         timestr = timestr[11:16]
         out = cv2.VideoWriter(self.destination+fldr+"//"+timestr+'.avi', fourcc, 20.0, (640, 480))
+
+        previousFrame = None
+        diffFrame = None
         while self.getState() == "on":
             _,frame = cap.read()
 
-            cv2.imshow('frame', frame)#show capture frame
-            #analyze the frame here
-            #if found mid-sized difference, start record
-            #else close record if open
-            k = cv2.waitKey(5) & 0xFF
-            if k == 27:
-                if self.getRec() == False:#turn on rec with esc
-                    self.setRec(True)
-                else:#turn off, save vid, with esc
-                    self.setRec(False)
+            if previousFrame is not None:
+                diffFrame = cv2.subtract(frame,previousFrame)
 
-            elif k == 113 and self.getRec() == False:#if quit with q
+                diffgray = cv2.cvtColor(diffFrame, cv2.COLOR_BGR2GRAY)
+                ret, mask = cv2.threshold(diffgray, 60, 255, cv2.THRESH_BINARY)#prev invert
+
+                cv2.imshow('mask', mask)#difference between prevFrame and current frame
+
+                if cv2.countNonZero(mask) == 0 and self.getRec() == True:
+                    print("Image is black")
+                    self.setRec(False)
+                elif cv2.countNonZero(mask) != 0 and self.getRec() == False:
+                    print("Colored image/have white color") #have movement
+                    self.setRec(True)
+
+            # save current frame
+            previousFrame = frame
+
+            cv2.imshow('frame', frame)  # show capture frame
+
+            if diffFrame is not None:
+                cv2.imshow('diff', diffFrame)  # show capture frame
+
+            k = cv2.waitKey(5) & 0xFF
+            if k == 113 and self.getRec() == False:#if quit with q
                 self.setState("off")
 
             if self.getRec() == True:  # user want to record
                 out.write(frame)
+
         cv2.destroyAllWindows()
         cap.release()
         out.release()  # release recording vid
