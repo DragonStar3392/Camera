@@ -3,6 +3,7 @@ import os
 import cv2
 import numpy as np
 import time
+from Timer import Timer
 
 class Camera:
     def __init__(self):
@@ -55,6 +56,11 @@ class Camera:
 
         previousFrame = None
         diffFrame = None
+
+        tNow = 0
+        fTime = 0
+        lock = False
+
         while self.getState() == "on":
             _,frame = cap.read()
 
@@ -66,20 +72,26 @@ class Camera:
 
                 cv2.imshow('mask', mask)#difference between prevFrame and current frame
 
-                if cv2.countNonZero(mask) == 0 and self.getRec() == True:
-                    print("Image is black")
-                    self.setRec(False)
-                elif cv2.countNonZero(mask) != 0 and self.getRec() == False:
-                    print("Colored image/have white color") #have movement
+                tNow = int(time.strftime("%S"))
+                if tNow == fTime:
+                    lock = False#lock from resetting timer
+                    #print("done unlocking")
+
+                if cv2.countNonZero(mask) != 0 and self.getRec() == False and lock == False:
+                    #print("Colored image/have white color")  # have movement
                     self.setRec(True)
+                    tNow = int(time.strftime("%S"))
+                    fTime = (tNow + 5) % 60#5second record and then recheck if there is movement
+                    lock = True
+
+                elif cv2.countNonZero(mask) == 0 and self.getRec() == True and lock == False:
+                    #print("Image is black")
+                    self.setRec(False)
 
             # save current frame
             previousFrame = frame
 
             cv2.imshow('frame', frame)  # show capture frame
-
-            if diffFrame is not None:
-                cv2.imshow('diff', diffFrame)  # show capture frame
 
             k = cv2.waitKey(5) & 0xFF
             if k == 113 and self.getRec() == False:#if quit with q
