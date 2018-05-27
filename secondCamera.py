@@ -9,7 +9,7 @@ class Camera:
         self.state = "off"
         self.rec = False
 
-        self.ID = 1
+        self.ID = 1 #2nd camera, 1st camera = 0
         self.destination = "C://Users//defaultuser0//PycharmProjects//untitled//"#save file destination
 
     def getState(self):
@@ -38,7 +38,7 @@ class Camera:
                 if os.path.isdir(des):#if destination exists
                     self.destination = des
             except:
-                print("something")
+                print("Sum Ting Wong")
     def setRec(self,b):
         if type(b) is bool:
             self.rec = b
@@ -52,25 +52,57 @@ class Camera:
             os.makedirs(self.destination+fldr)
         timestr = timestr[11:16]
         out = cv2.VideoWriter(self.destination+fldr+"//"+timestr+'.avi', fourcc, 20.0, (640, 480))
+
+        previousFrame = None
+        diffFrame = None
+
+        tNow = 0
+        fTime = 0
+        lock = False
+
         while self.getState() == "on":
             _,frame = cap.read()
 
-            cv2.imshow('frame', frame)#show capture frame
-            #analyze the frame here
-            #if found mid-sized difference, start record
-            #else close record if open
-            k = cv2.waitKey(5) & 0xFF
-            if k == 27:
-                if self.getRec() == False:#turn on rec with esc
+            if previousFrame is not None:
+                diffFrame = cv2.subtract(frame,previousFrame)
+
+                diffgray = cv2.cvtColor(diffFrame, cv2.COLOR_BGR2GRAY)
+                ret, mask = cv2.threshold(diffgray, 60, 255, cv2.THRESH_BINARY)#prev invert
+
+                #cv2.imshow('mask', mask)#difference between prevFrame and current frame
+
+                tNow = int(time.strftime("%S"))
+                if tNow == fTime:
+                    lock = False#lock from resetting timer
+                    #print("done unlocking")
+
+                if cv2.countNonZero(mask) != 0 and self.getRec() == False and lock == False:
+                    #print("Colored image/have white color")  # have movement
                     self.setRec(True)
-                else:#turn off, save vid, with esc
+                    tNow = int(time.strftime("%S"))
+                    fTime = (tNow + 5) % 60#5second record and then recheck if there is movement
+                    lock = True
+
+                elif cv2.countNonZero(mask) == 0 and self.getRec() == True and lock == False:
+                    #print("Image is black")
                     self.setRec(False)
 
-            elif k == 113 and self.getRec() == False:#if quit with q
-                self.setState("off")
+            # save current frame
+            previousFrame = frame
+
+            cv2.imshow('frame', frame)  # show capture frame
 
             if self.getRec() == True:  # user want to record
                 out.write(frame)
+
+            k = cv2.waitKey(5) & 0xFF
+            if k == 113 and self.getRec() == False:#if quit with q
+                self.setState("off")
+
+            if self.getState() == "off" and self.getRec() == True:
+                print("Cannot turn off while recording.")
+                self.setState("on")
+
         cv2.destroyAllWindows()
         cap.release()
         out.release()  # release recording vid
